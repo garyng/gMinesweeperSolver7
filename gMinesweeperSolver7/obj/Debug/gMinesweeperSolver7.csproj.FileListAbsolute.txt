@@ -1,0 +1,5 @@
+D:\Users\GaryNg-Win7\Desktop\gMinesweeperSolver7\gMinesweeperSolver7\bin\Debug\gMinesweeperSolver7.exe
+D:\Users\GaryNg-Win7\Desktop\gMinesweeperSolver7\gMinesweeperSolver7\bin\Debug\gMinesweeperSolver7.pdb
+D:\Users\GaryNg-Win7\Desktop\gMinesweeperSolver7\gMinesweeperSolver7\obj\Debug\gMinesweeperSolver7.csprojResolveAssemblyReference.cache
+D:\Users\GaryNg-Win7\Desktop\gMinesweeperSolver7\gMinesweeperSolver7\obj\Debug\gMinesweeperSolver7.exe
+D:\Users\GaryNg-Win7\Desktop\gMinesweeperSolver7\gMinesweeperSolver7\obj\Debug\gMinesweeperSolver7.pdb
