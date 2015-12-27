@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BytesBufferToStructExtension.cs" />
+    <Compile Include="gMinesweeperSolver.cs" />
     <Compile Include="ProcessMemoryReader.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
