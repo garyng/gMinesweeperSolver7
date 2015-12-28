@@ -16,7 +16,17 @@ namespace gMinesweeperSolver7
 			gMinesweeperSolver gms = new gMinesweeperSolver();
 			gms.Solve();
 
-			Console.ReadKey();
+			while (true)
+			{
+				Console.WriteLine("Press any key to start, q to quit");
+				if (Console.ReadKey().KeyChar == 'q')
+				{
+					break;
+				}
+				Console.WriteLine();
+				gms.Solve();
+			}
+			
 		}
 
 	}

@@ -724,7 +724,7 @@ namespace gMinesweeperSolver7
 
 		#endregion
 
-		#region Private Structs
+		#region Private Structs (Minesweeper-specific)
 
 		[StructLayout(LayoutKind.Sequential)]
 		private struct Board
@@ -771,57 +771,73 @@ namespace gMinesweeperSolver7
 
 		#endregion
 
-		#region Private Global Variable
+		#region Private Const
+		
+		private const string MINESWEEPER_PROCESS_NAME = "minesweeper";
+		private const string MINESWEEPER_EXE_PATH = @"C:\Program Files\Microsoft Games\Minesweeper\MineSweeper.exe";
 
-		private Process _pMine = new Process();
-		private IntPtr _ipBaseAdd;
-		private int _iModuleSize;
-		private ProcessMemoryReader _pmr = new ProcessMemoryReader();
-		private IntPtr _ipHwnd;
-		private Rect _rRect = new Rect();
+		private const int CELL_MINE_FLAG = 1;
+		private const int CELL_NO_MINE = 0;
+		private const int CELL_IGNORE = -1;
+		private const int CELL_NOT_PROCESSED = -2;
+		private const int CELL_IS_MINE = 9;
 
 		#endregion
 
+		#region Private Enum
 
-		private const string MINESWEEPER_PROCESS_NAME = "minesweeper";
-		private const string MINESWEEPER_EXE_PATH = @"C:\Program Files\Microsoft Games\Minesweeper\MineSweeper.exe";
+		private enum Direction
+		{
+			Right,
+			Left,
+			Up,
+			Down,
+			UpRight,
+			DownRight,
+			UpLeft,
+			DownLeft
+		}
+
+		#endregion
+
 
 		public void Solve()
 		{
 			solve();
 		}
 
+		#region Private Functions (Minesweeper-specific)
+
 		private void solve()
 		{
-			_pMine = findProcess(MINESWEEPER_PROCESS_NAME, MINESWEEPER_EXE_PATH);
+			Process pMine = findProcess(MINESWEEPER_PROCESS_NAME, MINESWEEPER_EXE_PATH);
 
-			Thread.Sleep(500);	// Sleep a while
+			Thread.Sleep(1000);	// Sleep a while
 
-			ProcessModule pmMine = _pMine.MainModule;
-			_ipBaseAdd = pmMine.BaseAddress;
-			_iModuleSize = pmMine.ModuleMemorySize;
-			_ipHwnd = getHwnd(_pMine);
-			
+			ProcessModule pmMine = pMine.MainModule;
+			IntPtr ipBaseAdd = pmMine.BaseAddress;
+			int iModSize = pmMine.ModuleMemorySize;
+			IntPtr ipHwnd = getHwnd(pMine);
 
 
-			bringWindowToFront(_ipHwnd);
-			setTopMost(_ipHwnd, false);
+			bringWindowToFront(ipHwnd);
+			setTopMost(ipHwnd, false);
 
-			Thread.Sleep(500); // Sleep, just sleep
+			Thread.Sleep(1000); // Sleep, just sleep
 
-			_rRect = getWindowRect(_ipHwnd);
+			Rect rRect = getWindowRect(ipHwnd);
 
-			_pmr = readerOpenProcess(_pMine);
-			IMAGE_SECTION_HEADER ish = findSection(_pmr, _ipBaseAdd, _iModuleSize, ".data");
+			ProcessMemoryReader _pmr = readerOpenProcess(pMine);
+			IMAGE_SECTION_HEADER ish = findSection(_pmr, ipBaseAdd, iModSize, ".data");
 
 			// Anonymous method FTW!
 			IntPtr iGamePtr = (IntPtr)readMemoryToT<UInt32>(
 				_pmr,
-				_ipBaseAdd + (int)ish.VirtualAddress + 0x88B4, 
-				new Func<byte[], UInt32>(delegate(byte[] buffer) 
-					{
-						return BitConverter.ToUInt32(buffer, 0); 
-					}));
+				ipBaseAdd + (int)ish.VirtualAddress + 0x88B4,
+				new Func<byte[], UInt32>(delegate(byte[] buffer)
+				{
+					return BitConverter.ToUInt32(buffer, 0);
+				}));
 
 			Game game = bytesToStruct<Game>(_pmr, iGamePtr);
 
@@ -833,40 +849,43 @@ namespace gMinesweeperSolver7
 
 			IntPtr iArrayBPtr = (IntPtr)arrayA.ArrayBPtr;
 			List<UInt32> lArrayBPtr = pointersToList(
-				_pmr, 
-				(int)board.Width, 
-				new Func<int,IntPtr>(delegate(int index)
-					{
-						return iArrayBPtr + Marshal.SizeOf(typeof(UInt32)) * index;
-					}),
-				new Func<byte[], UInt32>(delegate(byte[] buffer) 
-					{ 
-						return BitConverter.ToUInt32(buffer, 0); 
-					}));
+				_pmr,
+				(int)board.Width,
+				new Func<int, IntPtr>(delegate(int index)
+				{
+					return iArrayBPtr + Marshal.SizeOf(typeof(UInt32)) * index;
+				}),
+				new Func<byte[], UInt32>(delegate(byte[] buffer)
+				{
+					return BitConverter.ToUInt32(buffer, 0);
+				}));
 
 			List<ArrayB> lArrayB = pointersToList(
-				_pmr, 
-				lArrayBPtr.Count, 
-				new Func<int, IntPtr>(delegate(int index) 
-					{
-						return (IntPtr)lArrayBPtr[index];
-					}), 
+				_pmr,
+				lArrayBPtr.Count,
+				new Func<int, IntPtr>(delegate(int index)
+				{
+					return (IntPtr)lArrayBPtr[index];
+				}),
 				new Func<byte[], ArrayB>(delegate(byte[] buffer)
-					{ 
-						return buffer.ToStruct<ArrayB>(); 
-					}));
+				{
+					return buffer.ToStruct<ArrayB>();
+				}));
 
 			bool isEmpty;
-			int[,] iMines = pointersToMinesArray(_pmr,board,lArrayB,out isEmpty);
+			int[,] iMines = pointersToMinesArray(_pmr, board, lArrayB, out isEmpty);
 			if (isEmpty)
 			{
-				initMinesweeper(_rRect);
+				initMinesweeper(rRect);
 				iMines = pointersToMinesArray(_pmr, board, lArrayB, out isEmpty);
 			}
 
 			printMinesArray(iMines, (int)board.Height, (int)board.Width);
 
-			clickMines(_rRect, iMines, (int)board.Height, (int)board.Width);
+			int[,] processedArray = processMinesArray(iMines, (int)board.Height, (int)board.Width);
+			//visualizeArray(processedArray, (int)board.Height, (int)board.Width);
+
+			clickMines(rRect, processedArray, (int)board.Height, (int)board.Width);
 
 			readerCloseHandle(_pmr);
 		}
@@ -898,25 +917,31 @@ namespace gMinesweeperSolver7
 		{
 			mouseClick(rect, MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_LEFTUP, 1, 1);
 			mouseClick(rect, MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_LEFTUP, 1, 1);
-			Thread.Sleep(100);
+			Thread.Sleep(100); // Just sleep
 		}
 
-		private void clickMines(Rect rect, int[,] minesArray, int height, int width)
+		private void clickMines(Rect rect, int[,] processedArray, int height, int width)
 		{
+			int cur;
 			for (int y = 0; y < height; y++)
 			{
 				for (int x = 0; x < width; x++)
 				{
-					if (minesArray[y, x] == 0) //Left click
+					cur = processedArray[y,x];
+					if (cur == -1)
+					{
+						continue;
+					}
+					else if (cur == 0 || cur == -2) //Left click
 					{
 						mouseClick(rect, MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_LEFTUP, x, y);
 					}
-					else if (minesArray[y, x] == 1) //Right click
+					else if (cur == 1) //Right click
 					{
 						mouseClick(rect, MOUSEEVENTF_RIGHTDOWN | MOUSEEVENTF_RIGHTUP, x, y);
 					}
-					// -1 = No Click
-					Thread.Sleep(20);
+
+					Thread.Sleep(25);
 				}
 			}
 		}
@@ -935,18 +960,74 @@ namespace gMinesweeperSolver7
 			{
 				for (int x = 0; x < width; x++)
 				{
-					//Console.Write(minesArray[y, x]);
+					string print;
 					if (minesArray[y, x] == 0)
 					{
-						Console.Write(calSurroundMinesSum(minesArray, x, y, height, width));
+						print = calSurroundMinesSum(minesArray, x, y, height, width).ToString();
 					}
 					else
 					{
-						Console.Write("X");
+						print = "X";
 					}
+					Console.Write(string.Format("{0,-2}", print));
 				}
 				Console.WriteLine();
 			}
+		}
+
+		#region Region Filling Functions (Reduce mouse clicks)
+
+		private struct Coordinate
+		{
+			public int X;
+			public int Y;
+			public Coordinate(int x, int y)
+			{
+				X = x;
+				Y = y;
+			}
+		}
+
+		private int[,] processMinesArray(int[,] minesArray, int height, int width)
+		{
+			// 0 -> Left click
+			// 1 -> Right click
+			// -1 -> Ignore
+			// -2 -> Not processed yet -> Left click
+			// 9 -> Mine
+
+			int[,] pA = new int[height, width];	// ProcessArray
+			int[,] sA = new int[height, width];	// SumArray
+
+			for (int i = 0; i < height; i++)
+			{
+				for (int j = 0; j < width; j++)
+				{
+					pA[i, j] = CELL_NOT_PROCESSED;
+					if (minesArray[i, j] == 1)	// This is a mine
+					{
+						sA[i, j] = CELL_IS_MINE;
+						pA[i, j] = CELL_MINE_FLAG;
+					}
+					else if (minesArray[i, j] == 0)
+					{
+						sA[i, j] = calSurroundMinesSum(minesArray, j, i, height, width);
+					}
+				}
+			}
+
+			for (int y = 0; y < height; y++)
+			{
+				for (int x = 0; x < width; x++)
+				{
+					if (sA[y, x] == 0 && pA[y, x] == CELL_NOT_PROCESSED)
+					{
+						fillNoMineRegion(pA, sA, x, y, height, width);
+					}
+				}
+			}
+
+			return pA;
 		}
 		private int calSurroundMinesSum(int[,] minesArray, int x, int y, int height, int width)
 		{
@@ -994,6 +1075,114 @@ namespace gMinesweeperSolver7
 			return sum;
 		}
 
+		private void visualizeArray(int[,] array, int height, int width)
+		{
+			for (int i = 0; i < height; i++)
+			{
+				for (int j = 0; j < width; j++)
+				{
+					Console.Write(string.Format("{0,2}", array[i, j].ToString()));
+				}
+				Console.WriteLine();
+			}
+		}
+
+		private void fillNoMineRegion(int[,] processArray, int[,] sumArray, int x, int y, int height, int width)
+		{
+			Coordinate startingPoint = new Coordinate(x, y);
+			Coordinate current = startingPoint;
+			Stack<Coordinate> path = new Stack<Coordinate>();
+
+			path.Push(startingPoint);
+			processArray[startingPoint.Y, startingPoint.X] = CELL_NO_MINE;	// Only click starting point
+
+			while (path.Count() > 0)
+			{
+				current = path.Pop();
+
+				if (sumArray[current.Y, current.X] > 0)	// Reached a no mine 'boundary'
+				{
+					continue;
+				}
+
+				foreach (Coordinate c in findValidDirection(processArray, height, width, current))
+				{
+					path.Push(c);
+				}
+			}
+
+		}
+		private IEnumerable<Coordinate> findValidDirection(int[,] processArray, int height, int width, Coordinate current)
+		{
+			Coordinate nextCoor = new Coordinate();
+			foreach (Direction dir in Enum.GetValues(typeof(Direction)))
+			{
+				nextCoor = getDirectionCoordinate(current, dir);
+				if (checkIsCoordinateValid(nextCoor, height, width))
+				{
+					if (processArray[nextCoor.Y, nextCoor.X] == CELL_NOT_PROCESSED)
+					{
+						processArray[nextCoor.Y, nextCoor.X] = CELL_IGNORE;
+						yield return nextCoor;
+					}
+				}
+			}
+		}
+		private Coordinate getDirectionCoordinate(Coordinate c, Direction dir)
+		{
+			if (dir == Direction.Right)
+			{
+				return new Coordinate(c.X + 1, c.Y);
+			}
+			else if (dir == Direction.Left)
+			{
+				return new Coordinate(c.X - 1, c.Y);
+			}
+			else if (dir == Direction.Up)
+			{
+				return new Coordinate(c.X, c.Y - 1);
+			}
+			else if (dir == Direction.Down)
+			{
+				return new Coordinate(c.X, c.Y + 1);
+			}
+			else if (dir == Direction.UpRight)
+			{
+				return new Coordinate(c.X + 1, c.Y - 1);
+			}
+			else if (dir == Direction.DownRight)
+			{
+				return new Coordinate(c.X + 1, c.Y + 1);
+			}
+			else if (dir == Direction.UpLeft)
+			{
+				return new Coordinate(c.X - 1, c.Y - 1);
+			}
+			else if (dir == Direction.DownLeft)
+			{
+				return new Coordinate(c.X - 1, c.Y + 1);
+			}
+			return c;
+		}
+		private bool checkIsCoordinateValid(Coordinate c, int height, int width)
+		{
+			if (c.X < 0 || c.X > width - 1)
+			{
+				return false;
+			}
+			if (c.Y < 0 || c.Y > height - 1)
+			{
+				return false;
+			}
+			return true;
+		}
+
+		#endregion
+
+		#endregion
+
+		#region Private Core Functions
+
 		private Process findProcess(string processName, string exePath )
 		{
 			Process[] pr = Process.GetProcessesByName(processName);
@@ -1038,7 +1227,7 @@ namespace gMinesweeperSolver7
 
 		private IMAGE_SECTION_HEADER findSection(ProcessMemoryReader pmr, IntPtr baseAddr, int modSize,string secName)
 		{
-			byte[] buffer = pmr.ReadProcessMemory(baseAddr, _iModuleSize);
+			byte[] buffer = pmr.ReadProcessMemory(baseAddr, modSize);
 			IMAGE_DOS_HEADER idh = buffer.ToStruct<IMAGE_DOS_HEADER>();
 
 			IMAGE_NT_HEADERS32 inh = bytesToStruct<IMAGE_NT_HEADERS32>(pmr, baseAddr + idh.e_lfanew);
@@ -1087,5 +1276,7 @@ namespace gMinesweeperSolver7
 				Marshal.SizeOf(typeof(T)));
 			return converterFunc(buffer);
 		}
+
+		#endregion
 	}
 }
